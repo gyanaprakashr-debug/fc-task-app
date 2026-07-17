@@ -10,8 +10,11 @@ import json
 def init_connection():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     
-    # Load the raw JSON string from secrets to prevent Streamlit formatting bugs
+    # Load the raw JSON string from secrets
     creds_dict = json.loads(st.secrets["google_json"])
+    
+    # CRITICAL FIX: Force the text '\n' to become actual structural line breaks
+    creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
     
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
@@ -60,6 +63,7 @@ else:
         st.rerun()
 
     # Identify if the user is an admin
+    # Change this to your actual admin email or ID
     is_admin = st.session_state.user_id.lower() == "admin@company.com" 
 
     # Fetch fresh data from Google Sheets
