@@ -13,10 +13,26 @@ def init_connection():
     ]
     
     creds_dict = dict(st.secrets["gcp_service_account"])
-    
-    # Fix literal \n in private_key
-    creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
-    
+    key = creds_dict["private_key"]
+
+    # Handle both literal \n and actual newlines
+    key = key.replace("\\n", "\n")
+
+    # PEM headers
+    header = "-----BEGIN PRIVATE KEY-----"
+    footer = "-----END PRIVATE KEY-----"
+
+    # If headers are missing, add them
+    if header not in key:
+        key = f"{header}\n" + key.strip() + f"\n{footer}\n"
+
+    # Extract pure base64 body and re-chunk into correct 64-char lines
+    body = key.replace(header, "").replace(footer, "").replace("\n", "").replace(" ", "").strip()
+    chunked = "\n".join(body[i:i+64] for i in range(0, len(body), 64))
+    key = f"{header}\n{chunked}\n{footer}\n"
+
+    creds_dict["private_key"] = key
+
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
     client = gspread.authorize(creds)
     sheet = client.open("FC Closure").sheet1
