@@ -3,6 +3,7 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 import json
+import textwrap
 
 # ==========================================
 # 1. SETUP GOOGLE SHEETS CONNECTION
@@ -13,11 +14,28 @@ def init_connection():
     # Load the raw JSON string safely
     creds_dict = json.loads(st.secrets["google_json"])
     
-    # 🚨 THE CRITICAL FIX: Put the line breaks back in for Google! 🚨
-    creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+    # 🚨 THE ULTIMATE FIX: REBUILD THE KEY FROM SCRATCH 🚨
+    # This rips the key apart and perfectly rebuilds it exactly how Google demands it,
+    # completely ignoring whatever formatting Streamlit applied to it.
+    raw_key = creds_dict["private_key"]
+    
+    # Strip EVERYTHING except the raw base64 characters
+    raw_key = raw_key.replace("-----BEGIN PRIVATE KEY-----", "")
+    raw_key = raw_key.replace("-----END PRIVATE KEY-----", "")
+    raw_key = raw_key.replace("\\n", "")
+    raw_key = raw_key.replace("\n", "")
+    raw_key = raw_key.replace(" ", "")
+    
+    # Break it into the exact 64-character chunks Google requires
+    formatted_key = "\n".join(textwrap.wrap(raw_key, 64))
+    
+    # Reattach the headers with perfectly clean line breaks
+    clean_key = f"-----BEGIN PRIVATE KEY-----\n{formatted_key}\n-----END PRIVATE KEY-----\n"
+    creds_dict["private_key"] = clean_key
     
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
+    
     # Make sure "FC Closure" matches your exact sheet name
     sheet = client.open("FC Closure").sheet1 
     return sheet
