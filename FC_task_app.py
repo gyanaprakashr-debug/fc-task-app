@@ -13,6 +13,9 @@ def init_connection():
     # Load the raw JSON string safely
     creds_dict = json.loads(st.secrets["google_json"])
     
+    # 🚨 THE CRITICAL FIX: Put the line breaks back in for Google! 🚨
+    creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+    
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
     # Make sure "FC Closure" matches your exact sheet name
