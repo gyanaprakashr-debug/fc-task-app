@@ -2,18 +2,16 @@ import streamlit as st
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
+import json
 
 # ==========================================
-# 1. SETUP GOOGLE SHEETS CONNECTION (UPDATED FOR CLOUD)
+# 1. SETUP GOOGLE SHEETS CONNECTION (JSON FOOLPROOF METHOD)
 # ==========================================
 def init_connection():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     
-    # Fetch credentials directly from Streamlit Secrets
-    creds_dict = dict(st.secrets["gcp_service_account"])
-    
-    # NEW: Force the private key to format new lines correctly to prevent JWT errors
-    creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+    # Load the raw JSON string from secrets to prevent Streamlit formatting bugs
+    creds_dict = json.loads(st.secrets["google_json"])
     
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
@@ -24,7 +22,7 @@ def init_connection():
 try:
     sheet = init_connection()
 except Exception as e:
-    st.error(f"Failed to connect to Google Sheets. Check your Streamlit Secrets. Error: {e}")
+    st.error(f"Failed to connect to Google Sheets. Error: {e}")
     st.stop()
 
 # ==========================================
@@ -62,7 +60,6 @@ else:
         st.rerun()
 
     # Identify if the user is an admin
-    # Change this to your actual admin email or ID
     is_admin = st.session_state.user_id.lower() == "admin@company.com" 
 
     # Fetch fresh data from Google Sheets
