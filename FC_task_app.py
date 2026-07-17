@@ -9,10 +9,13 @@ import pandas as pd
 def init_connection():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     
-    # NEW: Fetch credentials directly from Streamlit Secrets
+    # Fetch credentials directly from Streamlit Secrets
     creds_dict = dict(st.secrets["gcp_service_account"])
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     
+    # NEW: Force the private key to format new lines correctly to prevent JWT errors
+    creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+    
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
     # Make sure "FC Closure" matches your exact sheet name
     sheet = client.open("FC Closure").sheet1 
