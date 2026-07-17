@@ -10,7 +10,7 @@ import json
 def init_connection():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     
-    # Load your REAL credentials cleanly from Secrets
+    # Load the raw JSON string safely
     creds_dict = json.loads(st.secrets["google_json"])
     
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
@@ -60,6 +60,7 @@ else:
         st.rerun()
 
     # Identify if the user is an admin
+    # Change this to your actual admin email or ID
     is_admin = st.session_state.user_id.lower() == "admin@company.com" 
 
     # Fetch fresh data from Google Sheets
