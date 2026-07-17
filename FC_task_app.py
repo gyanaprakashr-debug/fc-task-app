@@ -2,10 +2,9 @@ import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
-import json
 
 # ==========================================
-# 1. SETUP GOOGLE SHEETS CONNECTION (MODERN METHOD)
+# 1. SETUP GOOGLE SHEETS CONNECTION
 # ==========================================
 def init_connection():
     scope = [
@@ -13,10 +12,10 @@ def init_connection():
         "https://www.googleapis.com/auth/drive"
     ]
     
-    # Load the raw JSON string safely from secrets
-    creds_dict = json.loads(st.secrets["google_json"])
+    # Directly pull the structured dictionary out from Streamlit Secrets
+    creds_dict = dict(st.secrets["gcp_service_account"])
     
-    # Using the official modern Google-auth library to automatically handle signatures
+    # Official Google library directly digests the structured object natively
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
     client = gspread.authorize(creds)
     
