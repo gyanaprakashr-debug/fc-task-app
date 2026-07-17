@@ -1,39 +1,23 @@
 import streamlit as st
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+from google.oauth2.service_account import Credentials
 import pandas as pd
 import json
-import textwrap
 
 # ==========================================
-# 1. SETUP GOOGLE SHEETS CONNECTION
+# 1. SETUP GOOGLE SHEETS CONNECTION (MODERN METHOD)
 # ==========================================
 def init_connection():
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    scope = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
     
-    # Load the raw JSON string safely
+    # Load the raw JSON string safely from secrets
     creds_dict = json.loads(st.secrets["google_json"])
     
-    # 🚨 THE ULTIMATE FIX: REBUILD THE KEY FROM SCRATCH 🚨
-    # This rips the key apart and perfectly rebuilds it exactly how Google demands it,
-    # completely ignoring whatever formatting Streamlit applied to it.
-    raw_key = creds_dict["private_key"]
-    
-    # Strip EVERYTHING except the raw base64 characters
-    raw_key = raw_key.replace("-----BEGIN PRIVATE KEY-----", "")
-    raw_key = raw_key.replace("-----END PRIVATE KEY-----", "")
-    raw_key = raw_key.replace("\\n", "")
-    raw_key = raw_key.replace("\n", "")
-    raw_key = raw_key.replace(" ", "")
-    
-    # Break it into the exact 64-character chunks Google requires
-    formatted_key = "\n".join(textwrap.wrap(raw_key, 64))
-    
-    # Reattach the headers with perfectly clean line breaks
-    clean_key = f"-----BEGIN PRIVATE KEY-----\n{formatted_key}\n-----END PRIVATE KEY-----\n"
-    creds_dict["private_key"] = clean_key
-    
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+    # Using the official modern Google-auth library to automatically handle signatures
+    creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
     client = gspread.authorize(creds)
     
     # Make sure "FC Closure" matches your exact sheet name
@@ -81,7 +65,6 @@ else:
         st.rerun()
 
     # Identify if the user is an admin
-    # Change this to your actual admin email or ID
     is_admin = st.session_state.user_id.lower() == "admin@company.com" 
 
     # Fetch fresh data from Google Sheets
@@ -168,7 +151,6 @@ else:
             st.write(f"### ✅ Completed Tasks ({len(completed_tasks)})")
             
             if not completed_tasks.empty:
-                # Show summary of completed work
                 display_df = completed_tasks[['Product', 'SKU', 'Location', 'Quantity', 'Quantity Picked']]
                 st.dataframe(display_df, use_container_width=True)
             else:
