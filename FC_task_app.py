@@ -4,11 +4,15 @@ from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 
 # ==========================================
-# 1. SETUP GOOGLE SHEETS CONNECTION
+# 1. SETUP GOOGLE SHEETS CONNECTION (UPDATED FOR CLOUD)
 # ==========================================
 def init_connection():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
+    
+    # NEW: Fetch credentials directly from Streamlit Secrets
+    creds_dict = dict(st.secrets["gcp_service_account"])
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+    
     client = gspread.authorize(creds)
     # Make sure "FC Closure" matches your exact sheet name
     sheet = client.open("FC Closure").sheet1 
@@ -17,7 +21,7 @@ def init_connection():
 try:
     sheet = init_connection()
 except Exception as e:
-    st.error(f"Failed to connect to Google Sheets. Check your credentials.json file. Error: {e}")
+    st.error(f"Failed to connect to Google Sheets. Check your Streamlit Secrets. Error: {e}")
     st.stop()
 
 # ==========================================
