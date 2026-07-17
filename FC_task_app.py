@@ -2,6 +2,7 @@ import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
+import json
 
 # ==========================================
 # 1. SETUP GOOGLE SHEETS CONNECTION
@@ -12,14 +13,26 @@ def init_connection():
         "https://www.googleapis.com/auth/drive"
     ]
     
-    # Directly pull the structured dictionary out from Streamlit Secrets
+    # Load the structured dictionary directly from Streamlit Secrets
     creds_dict = dict(st.secrets["gcp_service_account"])
     
-    # Official Google library directly digests the structured object natively
+    # 🚨 FIX FOR PEM INVALID HEADER ERROR 🚨
+    # Standardize any literal character strings
+    raw_key = creds_dict["private_key"].replace("\\n", "\n")
+    
+    # Strip any existing headers and whitespace to isolate the pure base64 key payload
+    clean_base64 = raw_key.replace("-----BEGIN PRIVATE KEY-----", "")
+    clean_base64 = clean_base64.replace("-----END PRIVATE KEY-----", "")
+    clean_base64 = clean_base64.strip().replace("\n", "").replace(" ", "").replace("\r", "")
+    
+    # Programmatically rebuild the key with precise Python newline structures
+    creds_dict["private_key"] = f"-----BEGIN PRIVATE KEY-----\n{clean_base64}\n-----END PRIVATE KEY-----\n"
+    
+    # Authorize using the official modern Google credentials framework
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
     client = gspread.authorize(creds)
     
-    # Make sure "FC Closure" matches your exact sheet name
+    # Verify this matches your exact Google Sheet filename
     sheet = client.open("FC Closure").sheet1 
     return sheet
 
