@@ -7,8 +7,12 @@ import pandas as pd
 # 1. SETUP GOOGLE SHEETS CONNECTION
 # ==========================================
 def init_connection():
-    # Streamlit natively converts the [gcp_service_account] block into a perfect dictionary
+    # Pull the dictionary from Streamlit Secrets
     creds_dict = dict(st.secrets["gcp_service_account"])
+    
+    # THE MANDATORY FIX: This is the exact line that clears the JWT error 
+    # by forcing the hidden '\n' text to act as real line breaks for Google.
+    creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
     
     scope = [
         "https://www.googleapis.com/auth/spreadsheets",
