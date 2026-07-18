@@ -2,19 +2,31 @@ import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
-import json
 
 # ==========================================
 # 1. SETUP GOOGLE SHEETS CONNECTION
 # ==========================================
 def init_connection():
+    # Explicitly build the dictionary line-by-line to bypass Streamlit parser bugs
+    creds_dict = {
+        "type": st.secrets["type"],
+        "project_id": st.secrets["project_id"],
+        "private_key_id": st.secrets["private_key_id"],
+        # CRITICAL: We manually force the text '\n' to become real line breaks here
+        "private_key": st.secrets["private_key"].replace('\\n', '\n'),
+        "client_email": st.secrets["client_email"],
+        "client_id": st.secrets["client_id"],
+        "auth_uri": st.secrets["auth_uri"],
+        "token_uri": st.secrets["token_uri"],
+        "auth_provider_x509_cert_url": st.secrets["auth_provider_x509_cert_url"],
+        "client_x509_cert_url": st.secrets["client_x509_cert_url"],
+        "universe_domain": "googleapis.com"
+    }
+    
     scope = [
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive"
     ]
-    
-    # Safely load the untouched JSON text from Streamlit Secrets
-    creds_dict = json.loads(st.secrets["google_json"])
     
     # Authorize using the official modern Google credentials framework
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
