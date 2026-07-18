@@ -3,20 +3,23 @@ import pandas as pd
 from streamlit_gsheets import GSheetsConnection
 
 # ==========================================
-# 1. SETUP GOOGLE SHEETS CONNECTION (OFFICIAL WAY)
+# 1. PASTE YOUR GOOGLE SHEET LINK HERE
+# ==========================================
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1QBuZ5NV97NfdinHjesf0KB5436p1k3Xp7cZ8VAXtcGk/edit?gid=0#gid=0"
+
+# ==========================================
+# 2. SETUP GOOGLE SHEETS CONNECTION
 # ==========================================
 try:
-    # This completely bypasses manual JWT processing
     conn = st.connection("gsheets", type=GSheetsConnection)
-    # Read the data to verify connection (Change 'FC Closure' if your sheet tab is named differently)
-    df = conn.read(worksheet="FC Closure")
+    # We now explicitly tell Streamlit WHICH spreadsheet to open
+    df = conn.read(spreadsheet=SHEET_URL, worksheet="FC Closure")
 except Exception as e:
     st.error(f"Failed to connect to Google Sheets. Error: {e}")
-    st.info("If this fails, ensure the Service Account email is explicitly shared as an 'Editor' on the Google Sheet.")
     st.stop()
 
 # ==========================================
-# 2. SESSION STATE FOR LOGIN
+# 3. SESSION STATE FOR LOGIN
 # ==========================================
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -26,7 +29,7 @@ if "user_id" not in st.session_state:
 st.title("📦 FC Task Management App")
 
 # ==========================================
-# 3. LOGIN SCREEN
+# 4. LOGIN SCREEN
 # ==========================================
 if not st.session_state.logged_in:
     st.subheader("Employee Login")
@@ -39,7 +42,7 @@ if not st.session_state.logged_in:
         st.rerun()
 
 # ==========================================
-# 4. MAIN APP INTERFACE (LOGGED IN)
+# 5. MAIN APP INTERFACE (LOGGED IN)
 # ==========================================
 else:
     st.sidebar.write(f"Logged in as: **{st.session_state.user_id}**")
@@ -96,8 +99,8 @@ else:
                                 df.at[idx, 'Quantity Picked'] = picked_qty
                                 df.at[idx, 'Status'] = 'Completed'
                                 
-                                # Push the entire updated dataframe back to Google Sheets
-                                conn.update(worksheet="FC Closure", data=df)
+                                # Push the entire updated dataframe back to Google Sheets (Added the SHEET_URL here too)
+                                conn.update(spreadsheet=SHEET_URL, worksheet="FC Closure", data=df)
                                 
                                 st.toast(f"Saved: Picked {picked_qty} items!")
                                 st.rerun()
