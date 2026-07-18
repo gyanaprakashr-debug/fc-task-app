@@ -1,35 +1,59 @@
 import streamlit as st
+import gspread
+from google.oauth2.service_account import Credentials
 import pandas as pd
-from streamlit_gsheets import GSheetsConnection
+import json
 
 # ==========================================
-# 1. PASTE YOUR GOOGLE SHEET LINK HERE
+# 1. GOOGLE SHEET LINK
 # ==========================================
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1QBuZ5NV97NfdinHjesf0KB5436p1k3Xp7cZ8VAXtcGk/edit?gid=0#gid=0"
 
+st.title("📦 FC Task Management App")
+
 # ==========================================
-# 2. SETUP GOOGLE SHEETS CONNECTION
+# 2. BYPASS SECRETS: DIRECT FILE UPLOAD
 # ==========================================
-try:
-    conn = st.connection("gsheets", type=GSheetsConnection)
-    # We now explicitly tell Streamlit WHICH spreadsheet to open
-    df = conn.read(spreadsheet=SHEET_URL, worksheet="FC Closure")
-except Exception as e:
-    st.error(f"Failed to connect to Google Sheets. Error: {e}")
+st.info("🔐 We are bypassing Streamlit Secrets. Drag and drop your fresh credentials.json file below to connect.")
+uploaded_file = st.file_uploader("Upload credentials.json", type=["json"])
+
+if uploaded_file is None:
+    st.warning("Please upload your Google Cloud JSON key to start.")
     st.stop()
 
 # ==========================================
-# 3. SESSION STATE FOR LOGIN
+# 3. AUTHENTICATE DIRECTLY FROM THE FILE
+# ==========================================
+try:
+    # Read the physical file exactly as Google created it (zero formatting issues)
+    creds_dict = json.load(uploaded_file)
+    
+    scope = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
+    
+    creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
+    client = gspread.authorize(creds)
+    
+    # Connect using the URL
+    sheet = client.open_by_url(SHEET_URL).worksheet("FC Closure")
+    
+except Exception as e:
+    st.error(f"Google rejected the physical JSON file. Error: {e}")
+    st.error("FINAL DIAGNOSIS: The JWT assertion is signed with a private key not associated with the service account identified by the client email. If you see the 'Invalid JWT Signature' error here, your physical JSON file is permanently invalid. Flipkart's enterprise security is likely automatically disabling or revoking these keys as soon as you generate them.")
+    st.stop()
+
+# ==========================================
+# 4. SESSION STATE FOR LOGIN
 # ==========================================
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "user_id" not in st.session_state:
     st.session_state.user_id = ""
 
-st.title("📦 FC Task Management App")
-
 # ==========================================
-# 4. LOGIN SCREEN
+# 5. LOGIN SCREEN
 # ==========================================
 if not st.session_state.logged_in:
     st.subheader("Employee Login")
@@ -42,7 +66,7 @@ if not st.session_state.logged_in:
         st.rerun()
 
 # ==========================================
-# 5. MAIN APP INTERFACE (LOGGED IN)
+# 6. MAIN APP INTERFACE (LOGGED IN)
 # ==========================================
 else:
     st.sidebar.write(f"Logged in as: **{st.session_state.user_id}**")
@@ -53,7 +77,10 @@ else:
 
     is_admin = st.session_state.user_id.lower() == "admin@company.com" 
 
-    # Validate essential columns exist
+    # Fetch fresh data
+    raw_data = sheet.get_all_records()
+    df = pd.DataFrame(raw_data)
+
     required_cols = ['Assign to', 'Quantity Picked', 'Status']
     for col in required_cols:
         if col not in df.columns:
@@ -72,7 +99,6 @@ else:
     else:
         st.subheader("Your Task Dashboard")
         
-        # Filter ALL tasks for the logged-in ID
         employee_tasks = df[df['Assign to'].astype(str).str.lower() == st.session_state.user_id.lower()]
 
         if employee_tasks.empty:
@@ -92,16 +118,14 @@ else:
                         st.write(f"**SKU:** {row.get('SKU', 'N/A')} | **Target Quantity:** {row.get('Quantity', 'N/A')}")
                         
                         picked_qty = st.number_input("Enter Quantity Picked:", min_value=0, step=1, key=f"qty_{idx}")
+                        sheet_row_index = idx + 2 
                         
                         if st.button("Submit & Complete", key=f"btn_{idx}"):
                             try:
-                                # Update the local dataframe
-                                df.at[idx, 'Quantity Picked'] = picked_qty
-                                df.at[idx, 'Status'] = 'Completed'
-                                
-                                # Push the entire updated dataframe back to Google Sheets (Added the SHEET_URL here too)
-                                conn.update(spreadsheet=SHEET_URL, worksheet="FC Closure", data=df)
-                                
+                                qty_col_index = df.columns.get_loc('Quantity Picked') + 1
+                                status_col_index = df.columns.get_loc('Status') + 1
+                                sheet.update_cell(sheet_row_index, qty_col_index, picked_qty)
+                                sheet.update_cell(sheet_row_index, status_col_index, "Completed")
                                 st.toast(f"Saved: Picked {picked_qty} items!")
                                 st.rerun()
                             except Exception as e:
@@ -113,8 +137,6 @@ else:
             if not completed_tasks.empty:
                 display_df = completed_tasks[['Product', 'SKU', 'Location', 'Quantity', 'Quantity Picked']]
                 st.dataframe(display_df, use_container_width=True)
-            else:
-                st.write("No completed tasks yet.")
 
 st.divider()
 st.markdown("<p style='text-align: center; color: gray;'>© 2026 Developed by Gyana Prakash Rout</p>", unsafe_allow_html=True)
