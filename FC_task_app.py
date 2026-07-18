@@ -7,12 +7,8 @@ import pandas as pd
 # 1. SETUP GOOGLE SHEETS CONNECTION
 # ==========================================
 def init_connection():
-    # Automatically convert all Streamlit Secrets into a dictionary
-    creds_dict = dict(st.secrets)
-    
-    # CRITICAL FIX: Manually force the text '\n' to become real line breaks
-    if "private_key" in creds_dict:
-        creds_dict["private_key"] = creds_dict["private_key"].replace('\\n', '\n')
+    # Streamlit natively converts the [gcp_service_account] block into a perfect dictionary
+    creds_dict = dict(st.secrets["gcp_service_account"])
     
     scope = [
         "https://www.googleapis.com/auth/spreadsheets",
@@ -68,7 +64,6 @@ else:
         st.rerun()
 
     # Identify if the user is an admin
-    # Change this to your actual admin email or ID
     is_admin = st.session_state.user_id.lower() == "admin@company.com" 
 
     # Fetch fresh data from Google Sheets
