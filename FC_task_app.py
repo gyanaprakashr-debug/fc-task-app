@@ -2,6 +2,7 @@ import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
+import json
 
 # ==========================================
 # 1. SETUP GOOGLE SHEETS CONNECTION
@@ -12,30 +13,15 @@ def init_connection():
         "https://www.googleapis.com/auth/drive"
     ]
     
-    creds_dict = dict(st.secrets["gcp_service_account"])
-    key = creds_dict["private_key"]
-
-    # Handle both literal \n and actual newlines
-    key = key.replace("\\n", "\n")
-
-    # PEM headers
-    header = "-----BEGIN PRIVATE KEY-----"
-    footer = "-----END PRIVATE KEY-----"
-
-    # If headers are missing, add them
-    if header not in key:
-        key = f"{header}\n" + key.strip() + f"\n{footer}\n"
-
-    # Extract pure base64 body and re-chunk into correct 64-char lines
-    body = key.replace(header, "").replace(footer, "").replace("\n", "").replace(" ", "").strip()
-    chunked = "\n".join(body[i:i+64] for i in range(0, len(body), 64))
-    key = f"{header}\n{chunked}\n{footer}\n"
-
-    creds_dict["private_key"] = key
-
+    # Safely load the untouched JSON text from Streamlit Secrets
+    creds_dict = json.loads(st.secrets["google_json"])
+    
+    # Authorize using the official modern Google credentials framework
     creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
     client = gspread.authorize(creds)
-    sheet = client.open("FC Closure").sheet1
+    
+    # Verify this matches your exact Google Sheet filename
+    sheet = client.open("FC Closure").sheet1 
     return sheet
 
 try:
@@ -79,7 +65,7 @@ else:
         st.rerun()
 
     # Identify if the user is an admin
-    is_admin = st.session_state.user_id.lower() == "admin@company.com"
+    is_admin = st.session_state.user_id.lower() == "admin@company.com" 
 
     # Fetch fresh data from Google Sheets
     raw_data = sheet.get_all_records()
@@ -96,6 +82,7 @@ else:
     if is_admin:
         st.subheader("Admin Dashboard")
         
+        # Download Report
         csv = df.to_csv(index=False).encode('utf-8')
         st.download_button(
             label="Download Complete Task Report (CSV)",
@@ -111,11 +98,13 @@ else:
     else:
         st.subheader("Your Task Dashboard")
         
+        # Filter ALL tasks for the logged-in ID
         employee_tasks = df[df['Assign to'].astype(str).str.lower() == st.session_state.user_id.lower()]
 
         if employee_tasks.empty:
             st.info("No tasks are currently assigned to this ID.")
         else:
+            # Split tasks into Pending and Completed
             pending_tasks = employee_tasks[employee_tasks['Status'].astype(str).str.title() != 'Completed']
             completed_tasks = employee_tasks[employee_tasks['Status'].astype(str).str.title() == 'Completed']
 
@@ -130,20 +119,24 @@ else:
                         st.write(f"**Product:** {row.get('Product', 'N/A')} | **Location:** {row.get('Location', 'N/A')}")
                         st.write(f"**SKU:** {row.get('SKU', 'N/A')} | **Target Quantity:** {row.get('Quantity', 'N/A')}")
                         
+                        # Input box for picked quantity
                         picked_qty = st.number_input(
-                            "Enter Quantity Picked:",
-                            min_value=0,
-                            step=1,
+                            "Enter Quantity Picked:", 
+                            min_value=0, 
+                            step=1, 
                             key=f"qty_{idx}"
                         )
                         
-                        sheet_row_index = idx + 2
-
+                        # Calculate exact row in Google Sheet
+                        sheet_row_index = idx + 2 
+                        
+                        # Submit Button
                         if st.button("Submit & Complete", key=f"btn_{idx}"):
                             try:
                                 qty_col_index = df.columns.get_loc('Quantity Picked') + 1
                                 status_col_index = df.columns.get_loc('Status') + 1
                                 
+                                # Update Sheet directly
                                 sheet.update_cell(sheet_row_index, qty_col_index, picked_qty)
                                 sheet.update_cell(sheet_row_index, status_col_index, "Completed")
                                 
@@ -158,8 +151,8 @@ else:
             st.write(f"### ✅ Completed Tasks ({len(completed_tasks)})")
             
             if not completed_tasks.empty:
-                display_cols = [c for c in ['Product', 'SKU', 'Location', 'Quantity', 'Quantity Picked'] if c in completed_tasks.columns]
-                st.dataframe(completed_tasks[display_cols], use_container_width=True)
+                display_df = completed_tasks[['Product', 'SKU', 'Location', 'Quantity', 'Quantity Picked']]
+                st.dataframe(display_df, use_container_width=True)
             else:
                 st.write("No completed tasks yet.")
 
